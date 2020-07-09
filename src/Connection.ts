@@ -1,4 +1,3 @@
-
 /*
  * Copyright 2018 Stocard GmbH.
  *
@@ -27,7 +26,7 @@ interface Options {
   username?: string
   password?: string
   privateKey?: string | Buffer
-  agentForward? : boolean
+  agentForward?: boolean
   bastionHost?: string
   passphrase?: string
   endPort?: number
@@ -45,8 +44,8 @@ interface ForwardingOptions {
 
 class SSHConnection {
 
-  private debug
-  private server
+  private readonly debug
+  private server: net.Server | undefined
   private connections: Client[] = []
   private isWindows = process.platform === 'win32'
 
@@ -59,7 +58,7 @@ class SSHConnection {
       this.options.endPort = 22
     }
     if (!options.privateKey && !options.agentForward && !options.skipAutoPrivateKey) {
-      const defaultFilePath = path.join(os.homedir(), '.ssh', 'id_rsa' )
+      const defaultFilePath = path.join(os.homedir(), '.ssh', 'id_rsa')
       if (fs.existsSync(defaultFilePath)) {
         this.options.privateKey = fs.readFileSync(defaultFilePath)
       }
@@ -67,7 +66,7 @@ class SSHConnection {
   }
 
   public async shutdown() {
-    this.debug("Shutdown connections")
+    this.debug('Shutdown connections')
     for (const connection of this.connections) {
       connection.removeAllListeners()
       connection.end()
@@ -82,7 +81,7 @@ class SSHConnection {
 
   public async tty() {
     const connection = await this.establish()
-    this.debug("Opening tty")
+    this.debug('Opening tty')
     await this.shell(connection)
   }
 
@@ -90,6 +89,25 @@ class SSHConnection {
     const connection = await this.establish()
     this.debug('Executing command "%s"', command)
     await this.shell(connection, command)
+  }
+
+  public async forward(options: ForwardingOptions): Promise<net.Server | undefined> {
+    const connection = await this.establish()
+    await new Promise((resolve, reject) => {
+      this.server = net.createServer((socket) => {
+        this.debug('Forwarding connection from "localhost:%d" to "%s:%d"', options.fromPort, options.toHost, options.toPort)
+        connection.forwardOut('localhost', options.fromPort, options.toHost || 'localhost', options.toPort, (error, stream) => {
+          if (error) {
+            return reject(error)
+          }
+          socket.pipe(stream)
+          stream.pipe(socket)
+        })
+      }).listen(options.fromPort, 'localhost', () => {
+        return resolve()
+      })
+    })
+    return this.server
   }
 
   private async shell(connection: Client, command?: string) {
@@ -181,7 +199,7 @@ class SSHConnection {
       // in fact they always contain a `encryption` header, so we can't do a simple check
       options['passphrase'] = this.options.passphrase
       const looksEncrypted: boolean = this.options.privateKey ? this.options.privateKey.toString().toLowerCase().includes('encrypted') : false
-      if (looksEncrypted && !options['passphrase'] && !this.options.noReadline ) {
+      if (looksEncrypted && !options['passphrase'] && !this.options.noReadline) {
         options['passphrase'] = await this.getPassphrase()
       }
       connection.on('ready', () => {
@@ -198,36 +216,14 @@ class SSHConnection {
         reject(error)
       }
 
-
     })
   }
 
   private async getPassphrase() {
     return new Promise((resolve) => {
-      const rl = readline.createInterface({
-        input: process.stdin,
-        output: process.stdout
-      })
+      const rl = readline.createInterface({ input: process.stdin, output: process.stdout })
       rl.question('Please type in the passphrase for your private key: ', (answer) => {
         return resolve(answer)
-      })
-    })
-  }
-
-  async forward(options: ForwardingOptions) {
-    const connection = await this.establish()
-    return new Promise((resolve, reject) => {
-      this.server = net.createServer((socket) => {
-        this.debug('Forwarding connection from "localhost:%d" to "%s:%d"', options.fromPort, options.toHost, options.toPort)
-        connection.forwardOut('localhost', options.fromPort, options.toHost || 'localhost', options.toPort, (error, stream) => {
-          if (error) {
-            return reject(error)
-          }
-          socket.pipe(stream)
-          stream.pipe(socket)
-        })
-      }).listen(options.fromPort, 'localhost', () => {
-        return resolve()
       })
     })
   }
