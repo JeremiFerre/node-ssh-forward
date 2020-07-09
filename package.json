@@ -1,10 +1,13 @@
 {
-  "name": "node-ssh-forward",
-  "version": "0.7.2",
+  "name": "@jeremiferre/node-ssh-forward",
+  "version": "0.7.3",
   "main": "dist/Connection.js",
   "author": "Martin Wentzel <wentzel@stocard.de>",
   "license": "MIT",
   "description": "Easy to use ssh client with port forwarding and bastion host support",
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com/"
+  },
   "dependencies": {
     "debug": "^4.1.1",
     "ssh2": "^0.8.9"
@@ -18,7 +21,7 @@
     "forward",
     "jump host"
   ],
-  "homepage": "https://github.com/Stocard/node-ssh-forward",
+  "homepage": "https://github.com/JeremiFerre/node-ssh-forward",
   "scripts": {
     "lint": "tslint -c tslint.json 'test/**/*.ts' 'src/**/*.ts'",
     "clean": "rm -rf dist",

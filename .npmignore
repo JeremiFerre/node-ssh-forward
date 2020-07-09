@@ -3,3 +3,4 @@ tsconfig.json
 tslint.json
 test
 .travis.yml
+.idea
